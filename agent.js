@@ -12,6 +12,10 @@ const REWARD_INDEX = 2;
 const NEXT_STATE_INDEX = 4;
 const GOAL_INDEX = 5;
 
+Array.prototype.pluck = function(key) {
+  return this.map(item => item[key]);
+}
+
 module.exports = class TradingAgent {
   /**
    * Constructor of SnakeGameAgent.
@@ -137,23 +141,29 @@ module.exports = class TradingAgent {
    * @param {tf.train.Optimizer} optimizer The optimizer object used to update
    *   the weights of the online network.
    */
+
+
+
+  // Q values: the maximum expected future rewards for action at each state
   trainOnReplayBatch(batchSize, gamma, optimizer) {
     // Get a batch of examples from the replay buffer.
     const batch = this.replayMemory.sample(batchSize);
     // console.log('batch', batch.map(example => example[1]))
     const lossFunction = () => tf.tidy(() => {
-      const stateTensor = getStateTensor(batch.map(example => example[STATE_INDEX]));
+      const stateTensor = getStateTensor(batch.pluck(STATE_INDEX));
       // console.log('state', stateTensor.arraySync());
-      const actionTensor = tf.tensor1d(batch.map(example => example[ACTION_INDEX]), 'int32');
+      const actionTensor = tf.tensor1d(batch.pluck(ACTION_INDEX), 'int32');
       // console.log('online', this.onlineNetwork.apply(stateTensor, {training: true}).arraySync())
       // console.log('actions', tf.oneHot(actionTensor, NUM_ACTIONS).arraySync())
 
       // get current state action values
+      // #Obtain the Q' values by feeding the new state through our network
+      // Q1 = sess.run(Qout,feed_dict={inputs1:np.identity(16)[s1:s1+1]})
       // const qs = this.onlineNetwork.apply(stateTensor, {training: true}).mul(tf.oneHot(actionTensor, NUM_ACTIONS)).sum(-1);
       
-      const rewardTensor = tf.tensor1d(batch.map(example => example[REWARD_INDEX]));
-      const nextStateTensor = getStateTensor(batch.map(example => example[NEXT_STATE_INDEX]));
-      const goalStateTensor = getStateTensor(batch.map(example => example[GOAL_INDEX]));
+      const rewardTensor = tf.tensor1d(batch.pluck(REWARD_INDEX));
+      const nextStateTensor = getStateTensor(batch.pluck(NEXT_STATE_INDEX));
+      const goalStateTensor = getStateTensor(batch.pluck(GOAL_INDEX));
 
       const stateGoalBatch = tf.concat([stateTensor, goalStateTensor], 1);
       const nonFinalNextStatesGoal = tf.concat([nextStateTensor, goalStateTensor], 1);
@@ -164,7 +174,7 @@ module.exports = class TradingAgent {
       // get next state values according to target network
       const nextMaxQTensor = this.targetNetwork.predict(nonFinalNextStatesGoal).max(-1);
       const doneMask = tf.scalar(1).sub(tf.tensor1d(batch.map(example => example[DONE_INDEX])).asType('float32'));
-      const targetQs = rewardTensor.add(nextMaxQTensor.mul(doneMask).mul(gamma));
+      const targetQs = rewardTensor.add(nextMaxQTensor.mul(gamma));
       // console.log('targetQs', targetQs.arraySync())
       // console.log('qs', qs.arraySync())
       return tf.losses.softmaxCrossEntropy(targetQs, stateActionValues);
