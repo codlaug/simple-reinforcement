@@ -115,12 +115,12 @@ async function train(agent, gamma, learningRate, cumulativeRewardThreshold, maxN
 
 const EPSILON_INIT = 0.5;
 const EPSILON_FINAL = 0.01;
-const EPSILON_DECAY_FRAMES = 10000
+const EPSILON_DECAY_FRAMES = 1000
 
 const BATCH_SIZE = 64;
 const GAMMA = 0.99;
-const LEARNING_RATE = 0.001;
-const REWARD_THRESHOLD = 1000000;
+const LEARNING_RATE = 0.01;
+const REWARD_THRESHOLD = 10000;
 const MAX_FRAMES = 1000000
 
 async function main() {

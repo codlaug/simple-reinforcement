@@ -4,6 +4,8 @@ const tf = require('@tensorflow/tfjs');
 const { LOOKBACKS } = require('./game');
 const { FEATURES } = require('./game');
 
+const HER = false;
+
 module.exports.createDeepQNetwork = function createDeepQNetwork(numActions) {
   if (!(Number.isInteger(numActions) && numActions > 1)) {
     throw new Error(
@@ -13,15 +15,23 @@ module.exports.createDeepQNetwork = function createDeepQNetwork(numActions) {
 
   const model = tf.sequential();
   model.add(tf.layers.dense({
-    units: 256,
+    units: 128,
     // activation: 'elu',
-    inputShape: [FEATURES*2],
+    inputShape: [FEATURES*(HER ? 2 : 1)],
     // unitForgetBias: true
   }));
+  model.add(tf.layers.batchNormalization());
+  model.add(tf.layers.dense({
+    units: 256,
+    // activation: 'elu',
+    inputShape: [FEATURES*(HER ? 2 : 1)],
+    // unitForgetBias: true
+  }));
+  model.add(tf.layers.batchNormalization());
   model.add(tf.layers.dense({units: 64, activation: 'tanh'}));
   // model.add(tf.layers.batchNormalization());
   model.add(tf.layers.dropout({rate: 0.2}));
-  model.add(tf.layers.dense({units: numActions, activation: 'softmax'}));
+  model.add(tf.layers.dense({units: numActions}));
 
   return model;
 }

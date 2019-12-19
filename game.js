@@ -112,7 +112,7 @@ module.exports.TradingGame = class TradingGame {
     if (done) {
       const endingBalance = (this.currency + (this.data[this.currentIndex] * this.assets)) - this.startingCurrency
       console.log('DONE~! REWARD:', endingBalance)
-      return {reward: endingBalance === 0 ? -10 : 0, done};
+      return {reward: endingBalance, done};
     }
 
     const assetPrice = this.data[this.currentIndex]
@@ -123,20 +123,28 @@ module.exports.TradingGame = class TradingGame {
     
     
     if(action === ACTION_BUY) {
+      if(assetPrice === 1) {
+        reward += 10;
+      } else {
+        console.log('wrong buy');
+      }
       if(this.currency > 0) {
-        const currencyToSpend = this.currency //Math.min(10, this.currency)
+        const currencyToSpend = this.currency; // Math.min(10, this.currency);
         this.assets += currencyToSpend / assetPrice
         this.currency -= currencyToSpend
         
         this.lastBuyPrice = assetPrice;
-        if(assetPrice === 1) {
-            reward += 10;
-        }
-        console.log(`BUY @${assetPrice} with ${currencyToSpend} currency`, `assets: ${this.assets}`, `currency: ${this.currency}`)
+
+        // console.log(`BUY @${assetPrice} with ${currencyToSpend} currency`, `assets: ${this.assets}`, `currency: ${this.currency}`)
       }
     } else if(action === ACTION_SELL) {
+      if(assetPrice === 2) {
+        reward += 10;
+      } else {
+        console.log('wrong sell');
+      }
       if(this.assets > 0) {
-        const assetsToSell = this.assets //Math.min(1, this.assets);
+        const assetsToSell = this.assets; // Math.min(15, this.assets);
         this.assets -= assetsToSell
         this.currency += assetsToSell * assetPrice
         
@@ -144,11 +152,9 @@ module.exports.TradingGame = class TradingGame {
         //     reward += this.data[this.currentIndex] - this.lastBuyPrice;
         //     this.lastBuyPrice = null;
         // }
-        if(assetPrice === 2) {
-            reward += 10;
-        }
+
         
-        console.log(`SELL @${assetPrice}`, `assets: ${this.assets}`, `currency: ${this.currency}`)
+        // console.log(`SELL @${assetPrice}`, `assets: ${this.assets}`, `currency: ${this.currency}`)
       }
     }
 
@@ -224,11 +230,11 @@ module.exports.getStateTensor = function getStateTensor(state) {
       continue;
     }
 
-    buffer.set(state[n].assets, n, 0);
-    buffer.set(state[n].currency, n, 1);
-    buffer.set(state[n].price, n, 2);
-    buffer.set(state[n].nextPrice, n, 3);
-    buffer.set(state[n].lastBuyPrice, n, 4);
+    buffer.set(state[n].assets, n, 3);
+    buffer.set(state[n].currency, n, 4);
+    buffer.set(state[n].price, n, 0);
+    buffer.set(state[n].nextPrice, n, 1);
+    buffer.set(state[n].lastBuyPrice, n, 2);
   }
   return buffer.toTensor();
 }

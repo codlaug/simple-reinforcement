@@ -5,16 +5,10 @@ const {createDeepQNetwork} = require('./dqn');
 const {getRandomAction, NUM_ACTIONS, ALL_ACTIONS, getStateTensor} = require('./game');
 const ReplayMemory = require('./replay_memory');
 
-const STATE_INDEX = 0;
-const DONE_INDEX = 3;
-const ACTION_INDEX = 1;
-const REWARD_INDEX = 2;
-const NEXT_STATE_INDEX = 4;
-const GOAL_INDEX = 5;
+const getLossFunction = require('./loss_function1');
 
-Array.prototype.pluck = function(key) {
-  return this.map(item => item[key]);
-}
+
+
 
 module.exports = class TradingAgent {
   /**
@@ -43,6 +37,7 @@ module.exports = class TradingAgent {
 
     this.onlineNetwork = createDeepQNetwork(NUM_ACTIONS);
     this.targetNetwork = createDeepQNetwork(NUM_ACTIONS);
+    this.targetNetwork.trainable = false;
 
     // this.optimizer = tf.train.sgd(config.learningRate);
 
@@ -85,9 +80,10 @@ module.exports = class TradingAgent {
         goal.assets *= 2;
         goal.currency *= 2;
         const goalTensor = getStateTensor(goal);
-        // console.log(stateTensor.arraySync())
-        const prediction = this.onlineNetwork.predict(tf.concat([stateTensor, goalTensor], 1));
-        // console.log(prediction.arraySync()[0])
+        // console.log('state', stateTensor.arraySync())
+        // const prediction = this.onlineNetwork.predict(tf.concat([stateTensor, goalTensor], 1)); // HER 
+        const prediction = this.onlineNetwork.predict(stateTensor);
+        console.log(state.price, 'pred', prediction.arraySync()[0])
         action = ALL_ACTIONS[prediction.argMax(-1).dataSync()[0]];
       });
     }
@@ -121,10 +117,10 @@ module.exports = class TradingAgent {
         const hindsightReplay = this.transitions[i];
         hindsightReplay.push(hindsightGoal);
         if(typeof hindsightReplay[4] !== 'undefined' && hindsightReplay[4].assets === hindsightGoal.assets && hindsightReplay[4].currency === hindsightGoal.currency) {
-          console.log('GOAL');
+          // console.log('GOAL');
           hindsightReplay[2] = 10;
         }
-        this.replayMemory.append(hindsightReplay);
+        // this.replayMemory.append(hindsightReplay); // HER
       }
       this.reset();
     }
@@ -149,42 +145,16 @@ module.exports = class TradingAgent {
     // Get a batch of examples from the replay buffer.
     const batch = this.replayMemory.sample(batchSize);
     // console.log('batch', batch.map(example => example[1]))
-    const lossFunction = () => tf.tidy(() => {
-      const stateTensor = getStateTensor(batch.pluck(STATE_INDEX));
-      // console.log('state', stateTensor.arraySync());
-      const actionTensor = tf.tensor1d(batch.pluck(ACTION_INDEX), 'int32');
-      // console.log('online', this.onlineNetwork.apply(stateTensor, {training: true}).arraySync())
-      // console.log('actions', tf.oneHot(actionTensor, NUM_ACTIONS).arraySync())
 
-      // get current state action values
-      // #Obtain the Q' values by feeding the new state through our network
-      // Q1 = sess.run(Qout,feed_dict={inputs1:np.identity(16)[s1:s1+1]})
-      // const qs = this.onlineNetwork.apply(stateTensor, {training: true}).mul(tf.oneHot(actionTensor, NUM_ACTIONS)).sum(-1);
-      
-      const rewardTensor = tf.tensor1d(batch.pluck(REWARD_INDEX));
-      const nextStateTensor = getStateTensor(batch.pluck(NEXT_STATE_INDEX));
-      const goalStateTensor = getStateTensor(batch.pluck(GOAL_INDEX));
-
-      const stateGoalBatch = tf.concat([stateTensor, goalStateTensor], 1);
-      const nonFinalNextStatesGoal = tf.concat([nextStateTensor, goalStateTensor], 1);
-
-      const stateActionValues = this.onlineNetwork.apply(stateGoalBatch, {training: true}).mul(tf.oneHot(actionTensor, NUM_ACTIONS)).sum(-1);;
-      // console.log(stateActionValues);
-
-      // get next state values according to target network
-      const nextMaxQTensor = this.targetNetwork.predict(nonFinalNextStatesGoal).max(-1);
-      const doneMask = tf.scalar(1).sub(tf.tensor1d(batch.map(example => example[DONE_INDEX])).asType('float32'));
-      const targetQs = rewardTensor.add(nextMaxQTensor.mul(gamma));
-      // console.log('targetQs', targetQs.arraySync())
-      // console.log('qs', qs.arraySync())
-      return tf.losses.softmaxCrossEntropy(targetQs, stateActionValues);
-    });
+    const lossFunction = getLossFunction(this.onlineNetwork, this.targetNetwork, batch, gamma);
 
     // Calculate the gradients of the loss function with repsect to the weights
     // of the online DQN.
     const grads = tf.variableGrads(lossFunction);
+    // console.log(grads.grads);
     // Use the gradients to update the online DQN's weights.
     optimizer.applyGradients(grads.grads);
+    // console.log('loss?', grads.value.arraySync());
     tf.dispose(grads);
     // TODO(cais): Return the loss value here?
   }
