@@ -7,6 +7,6 @@
   "dependencies": {
     "@tensorflow/tfjs": "^1.4.0",
     "machinelearn": "^2.1.5",
-    "shelljs": "^0.8.3"
+    "shelljs": "^0.8.5"
   }
 }
